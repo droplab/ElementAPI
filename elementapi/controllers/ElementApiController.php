@@ -29,7 +29,11 @@ class ElementApiController extends BaseController
 	 */
 	public function actionGetElements($configFactory = null, array $config = null)
 	{
-		if ($configFactory !== null)
+		$params = craft()->urlManager->getRouteParams();
+		$urlParams = $_SERVER['QUERY_STRING'];
+        $template = (isset($params['template']) ? $params['template'].$urlParams : null);
+
+        if ($configFactory !== null)
 		{
 			$params = craft()->urlManager->getRouteParams();
 			$variables = (isset($params['variables']) ? $params['variables'] : null);
@@ -48,6 +52,15 @@ class ElementApiController extends BaseController
 			craft()->config->get('defaults', 'elementapi'),
 			$config
 		);
+
+		// If Cache is set and a cache file is found, bail.
+		// 
+		if($config['cache'] && craft()->cache->get($template))
+		{
+			JsonHelper::sendJsonHeaders();
+			echo craft()->cache->get($template);
+			craft()->end();
+		}
 
 		if ($config['pageParam'] == 'p')
 		{
@@ -118,7 +131,14 @@ class ElementApiController extends BaseController
 		}
 
 		JsonHelper::sendJsonHeaders();
-		echo $fractal->createData($resource)->toJson();
+		$JsonValue = $fractal->createData($resource)->toJson();
+		echo $JsonValue;
+
+		// Cache the response
+		if($config['cache'])
+		{
+			craft()->cache->set($template, $JsonValue, $config['cacheTime']);
+		}
 
 		// End the request
 		craft()->end();
